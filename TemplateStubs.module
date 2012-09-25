@@ -1,0 +1,57 @@
+<?php
+
+/**
+ * 
+ */
+class TemplateStubs extends WireData implements Module {
+	/**
+	 * @return array module meta-data
+	 */
+	public static function getModuleInfo()
+  {
+		return array(
+			'title' => 'Template Stubs', 
+			'version' => 100, 
+			'summary' => 'Generates API stubs for Templates - useful when working with an IDE.',
+			'singular' => true, 
+			'autoload' => true, 
+    );
+	}
+
+	/**
+	 * Initialize the module
+	 */
+	public function init()
+  {
+    $this->addHookAfter('Templates::save', $this, 'afterTemplateSave');
+  }
+
+  public function afterTemplateSave(HookEvent $event)
+  {
+    /**
+     * @var Template $template
+     * @var InputField $field
+     */
+
+    if (!$event->return) {
+      return; // not successfully saved.
+    }
+
+    $template = $event->argumentsByName('item');
+
+    $stub = "<?php\n\nnamespace templates;\n\n/**\n";
+
+    foreach ($template->fields as $field) {
+      $stub .= " * @property mixed $".$field->name." ".$field->get('label|name')." (".get_class($field->type).")\n";
+    }
+
+    $class = str_replace(' ', '', ucwords(strtr($template->name, '-', ' ')));
+
+    $stub .= " */\nclass ".$class." extends Page\n{}\n";
+
+    header('Content-type:text/plain');
+
+    echo $stub;
+    die();
+  }
+}
