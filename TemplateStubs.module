@@ -4,54 +4,71 @@
  * 
  */
 class TemplateStubs extends WireData implements Module {
-	/**
-	 * @return array module meta-data
-	 */
-	public static function getModuleInfo()
-  {
-		return array(
-			'title' => 'Template Stubs', 
-			'version' => 100, 
-			'summary' => 'Generates API stubs for Templates - useful when working with an IDE.',
-			'singular' => true, 
-			'autoload' => true, 
-    );
-	}
-
-	/**
-	 * Initialize the module
-	 */
-	public function init()
-  {
-    $this->addHookAfter('Templates::save', $this, 'afterTemplateSave');
-  }
-
-  public function afterTemplateSave(HookEvent $event)
-  {
     /**
-     * @var Template $template
-     * @var InputField $field
+     * @return array module meta-data
      */
-
-    if (!$event->return) {
-      return; // not successfully saved.
+    public static function getModuleInfo()
+    {
+        return array(
+            'title' => 'Template Stubs', 
+            'version' => 100, 
+            'summary' => 'Generates API stubs for Templates - useful when working with an IDE.',
+            'singular' => true, 
+            'autoload' => true, 
+        );
     }
 
-    $template = $event->argumentsByName('item');
-
-    $stub = "<?php\n\nnamespace templates;\n\n/**\n";
-
-    foreach ($template->fields as $field) {
-      $stub .= " * @property mixed $".$field->name." ".$field->get('label|name')." (".get_class($field->type).")\n";
+    /**
+     * Initialize the module
+     */
+    public function init()
+    {
+        $this->addHookAfter('Templates::save', $this, 'afterTemplateSave');
     }
 
-    $class = str_replace(' ', '', ucwords(strtr($template->name, '-', ' ')));
+    public static $return_types = array(
+        'FieldtypeComments' => 'CommentArray|Comment[]',
+        'FieldtypeRepeater' => 'RepeaterPageArray|Page[]',
+        'FieldtypeCheckbox' => 'int',
+        'FieldtypeDatetime' => 'int|string',
+        'FieldtypeImage' => 'Pageimages|Pageimage[]', // TODO: API preference
+        'FieldtypeFile' => 'Pagefiles|Pagefile[]', // TODO: API preference
+        'FieldtypeFloat' => 'float',
+        'FieldtypeInteger' => 'int',
+        'FieldtypeModule' => 'string',
+        'FieldtypePage' => 'Page', // TODO: API preference
+        'FieldtypePassword' => 'Password',
+        // final fall-back types:
+        'FieldtypeText' => 'string',
+        'FieldtypeMulti' => 'array',
+    );
 
-    $stub .= " */\nclass ".$class." extends Page\n{}\n";
+    public function afterTemplateSave(HookEvent $event)
+    {
+        /**
+         * @var Template $template
+         * @var InputField $field
+         */
 
-    header('Content-type:text/plain');
+        if (!$event->return) {
+            return; // not successfully saved.
+        }
 
-    echo $stub;
-    die();
-  }
+        $template = $event->argumentsByName('item');
+
+        $stub = "<?php\n\nnamespace templates;\n\n/**\n";
+
+        foreach ($template->fields as $field) {
+            $stub .= " * @property mixed $".$field->name." ".$field->get('label|name')." (".get_class($field->type).")\n";
+        }
+
+        $class = str_replace(' ', '', ucwords(strtr($template->name, '-', ' ')));
+
+        $stub .= " */\nclass ".$class." extends Page\n{}\n";
+
+        header('Content-type:text/plain');
+
+        echo $stub;
+        die();
+    }
 }
