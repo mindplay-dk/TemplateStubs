@@ -1,7 +1,13 @@
 <?php
 
 /**
- * 
+ * ProcessWire 'TemplateStubs' module
+ *
+ * @author Rasmus Schultz <http://mindplay.dk/>
+ */
+
+/**
+ * This module generates 
  */
 class TemplateStubs extends WireData implements Module {
     /**
@@ -17,58 +23,165 @@ class TemplateStubs extends WireData implements Module {
             'autoload' => true, 
         );
     }
-
+    
+    /**
+     * @var string namespace for template-types
+     */
+    public $namespace = 'tpl';
+    
+    /**
+     * @var (string|Closure)[] hash where field-type class-name => property-type (or function(Field $field) : string)
+     */
+    public static $return_types;
+    
+    /**
+     * @var bool true, if changes were detected that require template stubs to be rebuilt
+     */
+    protected $must_rebuild = false;
+    
     /**
      * Initialize the module
      */
     public function init()
     {
-        $this->addHookAfter('Templates::save', $this, 'afterTemplateSave');
+        $this->addHookAfter('Templates::save', $this, 'mustRebuild');
+        
+        $this->addHookBefore('ProcessPageView::redirect', $this, 'rebuild');
+        
+        $this->addHookAfter('ProcessPageView::finished', $this, 'rebuild');
+        
+        self::$return_types = array(
+            'FieldtypeComments' => 'CommentArray|Comment[]',
+            'FieldtypeRepeater' => 'RepeaterPageArray|Page[]',
+            'FieldtypeCheckbox' => 'int',
+            'FieldtypeDatetime' => 'int|string',
+            'FieldtypeImage' => function (Field $field) {
+                return $field->maxFiles == 1
+                    ? 'Pageimage'
+                    : 'Pageimages|Pageimage[]';
+            },
+            'FieldtypeFile' => function (Field $field) {
+                return $field->maxFiles == 1
+                    ? 'Pagefile'
+                    : 'Pagefiles|Pagefile[]';
+            },
+            'FieldtypeFloat' => 'float',
+            'FieldtypeInteger' => 'int',
+            'FieldtypeModule' => 'string',
+            'FieldtypePage' => function (Field $field) {
+                $pageType = 'Page';
+                
+                if ($field->template_id) {
+                    $template = wire('templates')->get($field->template_id);
+                    
+                }
+                
+                switch ($field->derefAsPage) {
+                    case FieldtypePage::derefAsPageArray:
+                        return "PageArray|{$pageType}[]";
+                    case FieldtypePage::derefAsPageOrFalse:
+                        return '{$pageType}|false';
+                    case FieldtypePage::derefAsPageOrNullPage:
+                        return '{$pageType}|NullPage';
+                    default:
+                        return 'mixed';
+                }
+            },
+            'FieldtypePassword' => 'Password',
+            // final fall-back types:
+            'FieldtypeText' => 'string',
+            'FieldtypeMulti' => 'array',
+        );
     }
-
-    public static $return_types = array(
-        'FieldtypeComments' => 'CommentArray|Comment[]',
-        'FieldtypeRepeater' => 'RepeaterPageArray|Page[]',
-        'FieldtypeCheckbox' => 'int',
-        'FieldtypeDatetime' => 'int|string',
-        'FieldtypeImage' => 'Pageimages|Pageimage[]', // TODO: API preference
-        'FieldtypeFile' => 'Pagefiles|Pagefile[]', // TODO: API preference
-        'FieldtypeFloat' => 'float',
-        'FieldtypeInteger' => 'int',
-        'FieldtypeModule' => 'string',
-        'FieldtypePage' => 'Page', // TODO: API preference
-        'FieldtypePassword' => 'Password',
-        // final fall-back types:
-        'FieldtypeText' => 'string',
-        'FieldtypeMulti' => 'array',
-    );
-
-    public function afterTemplateSave(HookEvent $event)
+    
+    /**
+     * @param Template $template the Template for which to generate a class-name
+     * @return string documentation stub class-name (without namespace)
+     */
+    protected function getClassName(Template $template)
+    {
+        return strtr($template->name, '-', ' ');
+    }
+    
+    /**
+     * @return string Page property-type for the given Field
+     */
+    protected function getPropertyType(Field $field)
+    {
+        $type = $field->type;
+        
+        foreach (self::$return_types as $field_type => $property_type) {
+            if ($type instanceof $field_type) {
+                return is_callable($property_type)
+                    ? $property_type($field)
+                    : $property_type;
+            }
+        }
+        
+        return 'mixed';
+    }
+    
+    /**
+     * @param Template $template the template for which to generate an API documentation stub
+     * @return string PHP stub code (documentation only)
+     */
+    protected function createStub(Template $template)
     {
         /**
-         * @var Template $template
          * @var InputField $field
          */
 
-        if (!$event->return) {
-            return; // not successfully saved.
-        }
-
-        $template = $event->argumentsByName('item');
-
-        $stub = "<?php\n\nnamespace templates;\n\n/**\n";
+        $time = date('Y-m-d H:i:s');
+         
+        $stub = "<?php\n\n/**\n * Generated by TemplateStubs module $time"
+            . "\n * This file may be overwritten at any time."
+            . "\n */\n\nnamespace {$this->namespace};\n\nuse Page;\n\n/**\n";
 
         foreach ($template->fields as $field) {
-            $stub .= " * @property mixed $".$field->name." ".$field->get('label|name')." (".get_class($field->type).")\n";
+            $name = $field->name;
+            $field_type = get_class($field->type);
+            $description = $field->get('description|label|name');
+            $type = $this->getPropertyType($field);
+            
+            $stub .= " * @property {$type} \${$name} {$description}\n";
         }
-
-        $class = str_replace(' ', '', ucwords(strtr($template->name, '-', ' ')));
+        
+        $class = str_replace(' ', '', $this->getClassName($template));
 
         $stub .= " */\nclass ".$class." extends Page\n{}\n";
 
-        header('Content-type:text/plain');
+        return $stub;
+    }
+    
+    public function mustRebuild(HookEvent $event)
+    {
+        echo 'FOOOO';
+        
+        if (!$event->return) {
+            //return; // not successfully saved.
+        }
+        
+        $this->must_rebuild = true;
+    }
+    
+    public function rebuild(HookEvent $event)
+    {
+        echo 'REBUILD';
+        
+        if (false === $this->must_rebuild) {
+            return; // nothing to do
+        }
+        
+        /**
+         * @var Template $template
+         */
 
-        echo $stub;
+        foreach (wire('templates') as $template) {
+            echo $this->createStub($template);
+        }
+        
+        $this->must_rebuild = false;
+        
         die();
     }
 }
