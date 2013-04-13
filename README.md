@@ -1,7 +1,7 @@
 TemplateStubs
 =============
 
-ProcessWire plug-in that generates stub classes for IDE support in Templates.
+ProcessWire module that generates stub classes for IDE support.
 
 This is a useful tool for Template development for those using IDEs with static
 analysis, such as PhpStorm, NetBeans, etc.
@@ -22,11 +22,12 @@ might add the following:
      */
 
 This should enable an IDE with static analysis to auto-complete properties
-defined by the Fields used in the Template.
+of the `$page` object, defined by the Fields used in the Template.
 
 Because everything is a Page in ProcessWire, the built-in templates for
-things like "admin", "role" and "user" will also be picked up, which means
-you can have IDE support for any custom user-fields, too.
+things like "admin", "role" and "user" will also be documented, which means
+you can have IDE support for internal templates in modules, for any custom
+user-fields, etc.
 
 
 Example
@@ -58,7 +59,7 @@ The output from this module looks like this:
      * "basic-page" template
      *
      * @property string $title Title
-     * @property string $headline Use this instead of the Title if a longer headline is needed than what you want to appear in navigation. Some changes here
+     * @property string $headline Use this instead of the Title if a longer headline is needed than what you want to appear in navigation.
      * @property string $summary Summary
      * @property string $body Body Content
      * @property string $sidebar Sidebar
@@ -71,7 +72,7 @@ The output from this module looks like this:
      * "home" template
      *
      * @property string $title Title
-     * @property string $headline Use this instead of the Title if a longer headline is needed than what you want to appear in navigation. Some changes here
+     * @property string $headline Use this instead of the Title if a longer headline is needed than what you want to appear in navigation.
      * @property string $summary Summary
      * @property string $body Body Content
      * @property string $sidebar Sidebar
