@@ -18,7 +18,7 @@ class TemplateStubs extends WireData implements Module, ConfigurableModule
     {
         return array(
             'title' => 'Template Stubs', 
-            'version' => 101,
+            'version' => 102,
             'summary' => 'Generates API stubs for Templates - useful when working with an IDE.',
             'singular' => true,
             'autoload' => true,
@@ -95,7 +95,7 @@ class TemplateStubs extends WireData implements Module, ConfigurableModule
                 if ($field->template_id) {
                     $template = wire('templates')->get($field->template_id);
                     
-                    $pageType = $module->getClassName($template);
+                    $pageType = $module->getClassName($template->name);
                 }
                 
                 switch ($field->derefAsPage) {
@@ -134,12 +134,13 @@ class TemplateStubs extends WireData implements Module, ConfigurableModule
     }
 
     /**
-     * @param Template $template the Template for which to generate a class-name
-     * @return string documentation stub class-name (without namespace)
+     * @param string $name the Template name for which to generate a class-name
+     *
+*@return string documentation stub class-name (without namespace)
      */
-    public function getClassName(Template $template)
+    public function getClassName($name)
     {
-        return $this->prefix . strtr($template->name, '-', '_');
+        return $this->prefix . strtr($name, '-', '_');
     }
 
     /**
@@ -162,19 +163,29 @@ class TemplateStubs extends WireData implements Module, ConfigurableModule
     }
     
     /**
-     * @param Template $template the template for which to generate an API documentation stub
+     * @param Template|null $template the template for which to generate an API documentation stub (or NULL for "any")
      * @param bool[] hash where keys are class-names
      * @return string PHP stub code (documentation only)
      */
-    protected function createStub(Template $template, & $types)
+    protected function createStub(Template $template=null, & $types)
     {
         /**
          * @var InputField $field
          */
 
-        $stub = "/**\n * \"{$template->name}\" template\n *\n";
+        if ($template) {
+            // Generate a sub for a specific Template:
+            $stub = "/**\n * \"{$template->name}\" template\n *\n";
+            $class_name = $this->getClassName($template->name);
+            $fields = $template->fields;
+        } else {
+            // Generate the "any" template: (includes all Fields)
+            $stub = "/**\n * any template\n *\n";
+            $class_name = $this->getClassName('any');
+            $fields = wire()->fields;
+        }
 
-        foreach ($template->fields as $field) {
+        foreach ($fields as $field) {
             $name = $field->name;
             $property_type = $this->getPropertyType($field);
             
@@ -192,16 +203,15 @@ class TemplateStubs extends WireData implements Module, ConfigurableModule
             
             $doc = "@property {$property_type} \${$name}";
             $indent = strlen($doc) + 1;
-            $width = 80 - $indent;
+            $width = 100 - $indent;
             
-            $description = wordwrap($field->get('description|label|name'), $width, "\n * " . str_repeat(' ', $indent));
+            $description = wordwrap($field->get('description|label|name'), $width, "\n");
+            $description = str_replace("\n", "\n * " . str_repeat(' ', $indent), $description);
             
             $stub .= " * {$doc} {$description}\n";
         }
-        
-        $class = $this->getClassName($template);
 
-        $stub .= " */\nclass ".$class." extends Page\n{}\n";
+        $stub .= " */\nclass {$class_name} extends Page\n{}\n";
         
         return $stub;
     }
@@ -255,10 +265,12 @@ class TemplateStubs extends WireData implements Module, ConfigurableModule
         foreach (wire('templates') as $template) {
             $docs .= $this->createStub($template, $types) . "\n";
         }
-        
+
+        $docs .= $this->createStub(null, $types);
+
         foreach (wire('templates') as $template) {
             // filter template-types from the use-clause:
-            unset($types[$this->getClassName($template)]);
+            unset($types[$this->getClassName($template->name)]);
         }
 
         $time = date('Y-m-d H:i:s');

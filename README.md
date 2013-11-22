@@ -29,6 +29,10 @@ things like "admin", "role" and "user" will also be documented, which means
 you can have IDE support for internal templates in modules, for any custom
 user-fields, etc.
 
+In addition, a special class (e.g. `tpl\any`) will be generated, documenting
+all available Fields - this may be useful in situations where you have code
+intended to work with all (or certain) Fields, e.g. any type of Page.
+
 
 Example
 -------
